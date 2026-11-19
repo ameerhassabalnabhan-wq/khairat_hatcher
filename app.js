@@ -4,6 +4,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = "https://ulofkckropitsrgwtkdn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Qg5X1BAbzDs3r4cT3Z77Jg_M1NK2jhm";
 
+// حساب الزوار المشترك: أنشئ هذا البريد كمستخدم Auth في Supabase ولا توزّعه على الزوار.
+const VISITOR_EMAIL = "viewer@khairat.local";
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     persistSession: true,
@@ -17,7 +20,6 @@ const $ = id => document.getElementById(id);
 let session = null;
 let profile = null;
 let batches = [];
-let users = [];
 let loading = false;
 
 const isAdmin = () =>
@@ -55,7 +57,7 @@ function setLoading(value) {
 
 function renderAccess() {
   $("currentUser").textContent = session
-    ? `${profile?.full_name || session.user.email} (${isAdmin() ? "مدير" : "مشاهد"})`
+    ? `${profile?.full_name || (session.user.email === VISITOR_EMAIL ? "زائر" : session.user.email)} (${isAdmin() ? "مدير" : "مشاهد"})`
     : "زائر";
 
   $("logoutBtn").classList.toggle("hidden", !session);
@@ -63,7 +65,6 @@ function renderAccess() {
 
   $("accessNotice").classList.toggle("hidden", isApproved());
   $("appContent").classList.toggle("hidden", !isApproved());
-  $("adminPanel").classList.toggle("hidden", !isAdmin());
 
   document.querySelectorAll(".admin-only").forEach(el => {
     el.classList.toggle("hidden", !isAdmin());
@@ -96,7 +97,6 @@ async function loadProfile() {
 
   if (isApproved()) {
     await loadBatches();
-    if (isAdmin()) await loadUsers();
   }
 }
 
@@ -114,24 +114,6 @@ async function loadBatches() {
 
   batches = data || [];
   render();
-}
-
-async function loadUsers() {
-  if (!isAdmin()) return;
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id,full_name,role,status,created_at")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Load users error:", error);
-    toast("تعذر تحميل طلبات الحسابات");
-    return;
-  }
-
-  users = data || [];
-  renderRequests();
 }
 
 function render() {
@@ -154,8 +136,6 @@ function render() {
     .toLocaleString("en-US");
 
   $("archiveCount").textContent = archived.length;
-  $("pendingCount").textContent =
-    users.filter(u => u.status === "pending").length;
 
   $("archiveLabel").textContent = `${archived.length} سجل`;
 
@@ -208,53 +188,13 @@ function render() {
     `).join("")
     : `<tr><td colspan="9" class="empty">لا توجد سجلات مؤرشفة.</td></tr>`;
 
-  renderRequests();
 }
 
-function renderRequests() {
-  if (!isAdmin()) return;
-
-  const pending = users.filter(u => u.status === "pending");
-
-  $("requestsList").innerHTML = pending.length
-    ? pending.map(u => `
-      <div class="request">
-        <div>
-          <b>${esc(u.full_name)}</b>
-          <small>${esc(u.id)} · طلب انضمام</small>
-        </div>
-        <div class="request-actions">
-          <button class="mini-btn approve" data-approve="${u.id}">موافقة</button>
-          <button class="mini-btn reject" data-reject="${u.id}">رفض</button>
-        </div>
-      </div>
-    `).join("")
-    : `<p class="empty">لا توجد طلبات معلقة.</p>`;
-}
-
-function showAuth(tab = "login") {
+function showAuth() {
   $("authDialog").showModal();
-  switchAuth(tab);
 }
 
-function switchAuth(tab) {
-  $("loginForm").classList.toggle("hidden", tab !== "login");
-  $("registerForm").classList.toggle("hidden", tab !== "register");
-
-  document.querySelectorAll(".tab").forEach(t => {
-    t.classList.toggle("active", t.dataset.authTab === tab);
-  });
-
-  $("authTitle").textContent =
-    tab === "login" ? "تسجيل الدخول" : "طلب إنشاء حساب";
-}
-
-$("openLoginBtn").onclick = () => showAuth("login");
-$("noticeRegisterBtn").onclick = () => showAuth("register");
-
-document.querySelectorAll("[data-auth-tab]").forEach(button => {
-  button.onclick = () => switchAuth(button.dataset.authTab);
-});
+$("openLoginBtn").onclick = showAuth;
 
 document.querySelectorAll("[data-close]").forEach(button => {
   button.onclick = () => $(button.dataset.close).close();
@@ -268,7 +208,8 @@ $("loginForm").onsubmit = async e => {
   setLoading(true);
 
   try {
-    const email = $("loginEmail").value.trim().toLowerCase();
+    const enteredEmail = $("loginEmail").value.trim().toLowerCase();
+    const email = enteredEmail || VISITOR_EMAIL;
     const password = $("loginPassword").value;
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -292,9 +233,7 @@ $("loginForm").onsubmit = async e => {
       profile = null;
       renderAccess();
 
-      toast(profile?.status === "pending"
-        ? "الحساب بانتظار موافقة المدير"
-        : "الحساب غير مفعل");
+      toast("هذا الحساب غير مفعل. راجع مدير المفقس.");
       return;
     }
 
@@ -305,45 +244,6 @@ $("loginForm").onsubmit = async e => {
   } catch (error) {
     console.error("Login error:", error);
     toast("فشل تسجيل الدخول: " + error.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-// إنشاء حساب جديد
-$("registerForm").onsubmit = async e => {
-  e.preventDefault();
-
-  if (loading) return;
-  setLoading(true);
-
-  try {
-    const name = $("registerName").value.trim();
-    const email = $("registerEmail").value.trim().toLowerCase();
-    const password = $("registerPassword").value;
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: name }
-      }
-    });
-
-    if (error) throw error;
-
-    $("registerForm").reset();
-    $("authDialog").close();
-
-    if (data.session) {
-      await supabase.auth.signOut();
-    }
-
-    toast("تم إرسال طلب الحساب، انتظر موافقة المدير");
-
-  } catch (error) {
-    console.error("Registration error:", error);
-    toast("تعذر إنشاء الحساب: " + error.message);
   } finally {
     setLoading(false);
   }
@@ -362,7 +262,6 @@ $("logoutBtn").onclick = async () => {
   session = null;
   profile = null;
   batches = [];
-  users = [];
 
   renderAccess();
   toast("تم تسجيل الخروج");
@@ -552,50 +451,7 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  const approve = e.target.closest("[data-approve]");
 
-  if (approve && isAdmin()) {
-    const id = approve.dataset.approve;
-
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ status: "approved" })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      await loadUsers();
-      toast("تمت الموافقة على الحساب");
-
-    } catch (error) {
-      console.error("Approve error:", error);
-      toast("تعذرت الموافقة: " + error.message);
-    }
-    return;
-  }
-
-  const reject = e.target.closest("[data-reject]");
-
-  if (reject && isAdmin()) {
-    const id = reject.dataset.reject;
-
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ status: "rejected" })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      await loadUsers();
-      toast("تم رفض طلب الحساب");
-
-    } catch (error) {
-      console.error("Reject error:", error);
-      toast("تعذر رفض الحساب: " + error.message);
-    }
-  }
 });
 
 // استعادة جلسة الدخول مرة واحدة
@@ -625,8 +481,7 @@ supabase.auth.onAuthStateChange((event, newSession) => {
     session = null;
     profile = null;
     batches = [];
-    users = [];
-    renderAccess();
+      renderAccess();
   }
 });
 
