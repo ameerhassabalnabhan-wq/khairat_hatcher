@@ -1,11 +1,16 @@
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const SUPABASE_URL = "https://ulofkckropitsrgwtkdn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Qg5X1BAbzDs3r4cT3Z77Jg_M1NK2jhm";
 
-const sb = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 const $ = id => document.getElementById(id);
 
@@ -13,7 +18,7 @@ let session = null;
 let profile = null;
 let batches = [];
 let users = [];
-let realtimeChannel = null;
+let loading = false;
 
 const isAdmin = () =>
   profile?.role === "admin" && profile?.status === "approved";
@@ -23,20 +28,17 @@ const isApproved = () =>
 
 const esc = value =>
   String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;", "<":"&lt;", ">":"&gt;",
-    '"':"&quot;", "'":"&#39;"
-  }[c]));
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[c]);
 
 const fmt = value =>
   value ? new Date(value).toLocaleString("ar-IQ") : "—";
 
-const localInput = value => {
-  if (!value) return "";
-  const d = new Date(value);
-  const offset = d.getTimezoneOffset();
-  return new Date(d.getTime() - offset * 60000)
-    .toISOString().slice(0,16);
-};
+const dateFmt = value => value || "—";
 
 function toast(message) {
   const el = $("toast");
@@ -45,9 +47,189 @@ function toast(message) {
   setTimeout(() => el.classList.remove("show"), 3000);
 }
 
-function showError(error) {
-  console.error(error);
-  toast(error?.message || "حدث خطأ، حاول مرة أخرى");
+function setLoading(value) {
+  loading = value;
+  const button = $("addBatchBtn");
+  if (button) button.disabled = value;
+}
+
+function renderAccess() {
+  $("currentUser").textContent = session
+    ? `${profile?.full_name || session.user.email} (${isAdmin() ? "مدير" : "مشاهد"})`
+    : "زائر";
+
+  $("logoutBtn").classList.toggle("hidden", !session);
+  $("openLoginBtn").classList.toggle("hidden", !!session);
+
+  $("accessNotice").classList.toggle("hidden", isApproved());
+  $("appContent").classList.toggle("hidden", !isApproved());
+  $("adminPanel").classList.toggle("hidden", !isAdmin());
+
+  document.querySelectorAll(".admin-only").forEach(el => {
+    el.classList.toggle("hidden", !isAdmin());
+  });
+}
+
+async function loadProfile() {
+  if (!session) {
+    profile = null;
+    renderAccess();
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,full_name,role,status")
+    .eq("id", session.user.id)
+    .single();
+
+  if (error) {
+    console.error("Profile error:", error);
+    toast("تعذر تحميل بيانات الحساب");
+    profile = null;
+    renderAccess();
+    return;
+  }
+
+  profile = data;
+  renderAccess();
+
+  if (isApproved()) {
+    await loadBatches();
+    if (isAdmin()) await loadUsers();
+  }
+}
+
+async function loadBatches() {
+  const { data, error } = await supabase
+    .from("batches")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Load batches error:", error);
+    toast("تعذر تحميل الوجبات: " + error.message);
+    return;
+  }
+
+  batches = data || [];
+  render();
+}
+
+async function loadUsers() {
+  if (!isAdmin()) return;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,full_name,role,status,created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Load users error:", error);
+    toast("تعذر تحميل طلبات الحسابات");
+    return;
+  }
+
+  users = data || [];
+  renderRequests();
+}
+
+function render() {
+  renderAccess();
+
+  if (!isApproved()) return;
+
+  const active = batches
+    .filter(b => !b.archived)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  const archived = batches
+    .filter(b => b.archived)
+    .sort((a, b) => new Date(b.archived_at) - new Date(a.archived_at));
+
+  $("activeCount").textContent = active.length;
+
+  $("eggCount").textContent = active
+    .reduce((sum, b) => sum + Number(b.eggs || 0), 0)
+    .toLocaleString("en-US");
+
+  $("archiveCount").textContent = archived.length;
+  $("pendingCount").textContent =
+    users.filter(u => u.status === "pending").length;
+
+  $("archiveLabel").textContent = `${archived.length} سجل`;
+
+  $("activeTable").innerHTML = active.length
+    ? active.map(b => `
+      <tr>
+        <td><b>${esc(b.number)}</b></td>
+        <td>${esc(b.machine)}</td>
+        <td>${esc(b.cartons)}</td>
+        <td>${Number(b.eggs).toLocaleString("en-US")}</td>
+        <td>${esc(b.type)}</td>
+        <td>${dateFmt(b.entry_date)}</td>
+        <td>${fmt(b.start_at)}</td>
+        <td>${fmt(b.temperature_at)}</td>
+        <td>${esc(b.trolleys ?? "—")}</td>
+        <td>${esc(b.candling)}
+          ${b.candling_at ? `<small>${fmt(b.candling_at)}</small>` : ""}
+        </td>
+        <td>${esc(b.transfer)}
+          ${b.transfer_at ? `<small>${fmt(b.transfer_at)}</small>` : ""}
+        </td>
+        <td><span class="status">${esc(b.hatch_status)}</span></td>
+        <td>
+          ${isAdmin() ? `
+            <button class="mini-btn edit" data-edit="${b.id}">تعديل</button>
+            <button class="mini-btn archive" data-archive="${b.id}">تحويل للسجلات</button>
+          ` : "—"}
+        </td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="13" class="empty">لا توجد وجبات نشطة حالياً.</td></tr>`;
+
+  $("archiveTable").innerHTML = archived.length
+    ? archived.map(b => `
+      <tr>
+        <td><b>${esc(b.number)}</b></td>
+        <td>${esc(b.machine)}</td>
+        <td>${Number(b.eggs).toLocaleString("en-US")}</td>
+        <td>${esc(b.type)}</td>
+        <td>${dateFmt(b.entry_date)}</td>
+        <td>${fmt(b.archived_at)}</td>
+        <td>${esc(b.chicks ?? "—")}</td>
+        <td>
+          ${b.eggs && b.chicks !== "" && b.chicks != null
+            ? `${(Number(b.chicks) / Number(b.eggs) * 100).toFixed(1)}%`
+            : "—"}
+        </td>
+        <td><button class="mini-btn view" data-view="${b.id}">عرض السجل</button></td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="9" class="empty">لا توجد سجلات مؤرشفة.</td></tr>`;
+
+  renderRequests();
+}
+
+function renderRequests() {
+  if (!isAdmin()) return;
+
+  const pending = users.filter(u => u.status === "pending");
+
+  $("requestsList").innerHTML = pending.length
+    ? pending.map(u => `
+      <div class="request">
+        <div>
+          <b>${esc(u.full_name)}</b>
+          <small>${esc(u.id)} · طلب انضمام</small>
+        </div>
+        <div class="request-actions">
+          <button class="mini-btn approve" data-approve="${u.id}">موافقة</button>
+          <button class="mini-btn reject" data-reject="${u.id}">رفض</button>
+        </div>
+      </div>
+    `).join("")
+    : `<p class="empty">لا توجد طلبات معلقة.</p>`;
 }
 
 function showAuth(tab = "login") {
@@ -59,212 +241,12 @@ function switchAuth(tab) {
   $("loginForm").classList.toggle("hidden", tab !== "login");
   $("registerForm").classList.toggle("hidden", tab !== "register");
 
-  document.querySelectorAll(".tab").forEach(t =>
-    t.classList.toggle("active", t.dataset.authTab === tab)
-  );
+  document.querySelectorAll(".tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.authTab === tab);
+  });
 
   $("authTitle").textContent =
     tab === "login" ? "تسجيل الدخول" : "طلب إنشاء حساب";
-}
-
-function renderAccess() {
-  $("currentUser").textContent =
-    profile ? profile.full_name + (isAdmin() ? " (مدير)" : " (موظف)") : "زائر";
-
-  $("logoutBtn").classList.toggle("hidden", !session);
-  $("openLoginBtn").classList.toggle("hidden", !!session);
-
-  $("accessNotice").classList.toggle("hidden", isApproved());
-  $("appContent").classList.toggle("hidden", !isApproved());
-
-  $("adminPanel").classList.toggle("hidden", !isAdmin());
-
-  document.querySelectorAll(".admin-only").forEach(el =>
-    el.classList.toggle("hidden", !isAdmin())
-  );
-
-  if (!session) {
-    $("accessNotice").querySelector("b").textContent =
-      "الدخول يتطلب موافقة المسؤول";
-    $("accessNotice").querySelector("p").textContent =
-      "يمكنك إنشاء حساب، لكن لن تتمكن من مشاهدة بيانات المفقس حتى تتم الموافقة.";
-  } else if (profile?.status === "pending") {
-    $("accessNotice").querySelector("b").textContent =
-      "حسابك بانتظار موافقة المسؤول";
-    $("accessNotice").querySelector("p").textContent =
-      "تم استلام طلبك. ستتمكن من الدخول إلى بيانات المفقس بعد موافقة الإدارة.";
-  } else if (profile?.status === "rejected") {
-    $("accessNotice").querySelector("b").textContent =
-      "لم تتم الموافقة على حسابك";
-    $("accessNotice").querySelector("p").textContent =
-      "يرجى التواصل مع إدارة المفقس.";
-  }
-}
-
-async function loadProfile() {
-  if (!session) {
-    profile = null;
-    return;
-  }
-
-  const { data, error } = await sb
-    .from("profiles")
-    .select("*")
-    .eq("id", session.user.id)
-    .maybeSingle();
-
-  if (error) throw error;
-
-  profile = data;
-}
-
-async function loadBatches() {
-  if (!isApproved()) return;
-
-  const { data, error } = await sb
-    .from("batches")
-    .select("*")
-    .order("created_at", { ascending: true });
-
-  if (error) throw error;
-
-  batches = data || [];
-  renderBatches();
-}
-
-async function loadUsers() {
-  if (!isAdmin()) return;
-
-  const { data, error } = await sb
-    .from("profiles")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
-
-  if (error) throw error;
-
-  users = data || [];
-  renderRequests();
-}
-
-function renderBatches() {
-  const active = batches.filter(b => !b.archived)
-    .sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-
-  const archived = batches.filter(b => b.archived)
-    .sort((a,b) => new Date(b.archived_at) - new Date(a.archived_at));
-
-  $("activeCount").textContent = active.length;
-
-  $("eggCount").textContent = active
-    .reduce((n,b) => n + Number(b.eggs || 0), 0)
-    .toLocaleString("en-US");
-
-  $("archiveCount").textContent = archived.length;
-  $("archiveLabel").textContent = `${archived.length} سجل`;
-  $("pendingCount").textContent = users.length;
-
-  $("activeTable").innerHTML = active.length
-    ? active.map(b => `<tr>
-      <td><b>${esc(b.number)}</b></td>
-      <td>${esc(b.machine)}</td>
-      <td>${esc(b.cartons)}</td>
-      <td>${Number(b.eggs).toLocaleString("en-US")}</td>
-      <td>${esc(b.type)}</td>
-      <td>${esc(b.entry_date || "—")}</td>
-      <td>${fmt(b.start_at)}</td>
-      <td>${fmt(b.temperature_at)}</td>
-      <td>${esc(b.trolleys || "—")}</td>
-      <td>${esc(b.candling)}${b.candling_at ? `<small>${fmt(b.candling_at)}</small>` : ""}</td>
-      <td>${esc(b.transfer)}${b.transfer_at ? `<small>${fmt(b.transfer_at)}</small>` : ""}</td>
-      <td><span class="status">${esc(b.hatch_status)}</span></td>
-      <td>${isAdmin() ? `
-        <button class="mini-btn edit" data-edit="${b.id}">تعديل</button>
-        <button class="mini-btn archive" data-archive="${b.id}">تحويل للسجلات</button>
-      ` : "—"}</td>
-    </tr>`).join("")
-    : `<tr><td colspan="13" class="empty">لا توجد وجبات نشطة حالياً.</td></tr>`;
-
-  $("archiveTable").innerHTML = archived.length
-    ? archived.map(b => `<tr>
-      <td><b>${esc(b.number)}</b></td>
-      <td>${esc(b.machine)}</td>
-      <td>${Number(b.eggs).toLocaleString("en-US")}</td>
-      <td>${esc(b.type)}</td>
-      <td>${esc(b.entry_date || "—")}</td>
-      <td>${fmt(b.archived_at)}</td>
-      <td>${esc(b.chicks ?? "—")}</td>
-      <td>${b.eggs && b.chicks != null && b.chicks !== ""
-        ? (Number(b.chicks)/Number(b.eggs)*100).toFixed(1)+"%" : "—"}</td>
-      <td><button class="mini-btn view" data-view="${b.id}">عرض السجل</button></td>
-    </tr>`).join("")
-    : `<tr><td colspan="9" class="empty">لا توجد سجلات مؤرشفة.</td></tr>`;
-}
-
-function renderRequests() {
-  if (!isAdmin()) return;
-
-  $("requestsList").innerHTML = users.length
-    ? users.map(u => `<div class="request">
-      <div>
-        <b>${esc(u.full_name)}</b>
-        <small>طلب انضمام · ${fmt(u.created_at)}</small>
-      </div>
-      <div class="request-actions">
-        <button class="mini-btn approve" data-approve="${u.id}">موافقة</button>
-        <button class="mini-btn reject" data-reject="${u.id}">رفض</button>
-      </div>
-    </div>`).join("")
-    : `<p class="empty">لا توجد طلبات معلقة.</p>`;
-}
-
-async function refreshApp() {
-  try {
-    const { data, error } = await sb.auth.getSession();
-    if (error) throw error;
-
-    session = data.session;
-
-    await loadProfile();
-    renderAccess();
-
-    if (isApproved()) {
-      await loadBatches();
-      if (isAdmin()) await loadUsers();
-    } else {
-      batches = [];
-      users = [];
-    }
-
-    setupRealtime();
-  } catch (error) {
-    showError(error);
-  }
-}
-
-function setupRealtime() {
-  if (realtimeChannel) {
-    sb.removeChannel(realtimeChannel);
-    realtimeChannel = null;
-  }
-
-  if (!isApproved()) return;
-
-  realtimeChannel = sb
-    .channel("khairat-live-updates")
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "batches"
-    }, () => loadBatches().catch(showError))
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "profiles"
-    }, async () => {
-      await refreshApp();
-    })
-    .subscribe();
 }
 
 $("openLoginBtn").onclick = () => showAuth("login");
@@ -278,34 +260,69 @@ document.querySelectorAll("[data-close]").forEach(button => {
   button.onclick = () => $(button.dataset.close).close();
 });
 
+// تسجيل الدخول
 $("loginForm").onsubmit = async e => {
   e.preventDefault();
 
+  if (loading) return;
+  setLoading(true);
+
   try {
-    const { error } = await sb.auth.signInWithPassword({
-      email: $("loginEmail").value.trim().toLowerCase(),
-      password: $("loginPassword").value
+    const email = $("loginEmail").value.trim().toLowerCase();
+    const password = $("loginPassword").value;
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
     });
 
     if (error) throw error;
 
+    session = data.session;
+    await loadProfile();
+
+    if (!profile) {
+      toast("تعذر قراءة ملف الحساب");
+      return;
+    }
+
+    if (profile.status !== "approved") {
+      await supabase.auth.signOut();
+      session = null;
+      profile = null;
+      renderAccess();
+
+      toast(profile?.status === "pending"
+        ? "الحساب بانتظار موافقة المدير"
+        : "الحساب غير مفعل");
+      return;
+    }
+
     $("authDialog").close();
-    await refreshApp();
-    toast(isApproved() ? "أهلاً بك في مفقس خيرات أربيل" : "تم تسجيل الدخول، حسابك بانتظار الموافقة");
+    $("loginForm").reset();
+    toast("أهلاً بك في مفقس خيرات أربيل");
+
   } catch (error) {
-    showError(error);
+    console.error("Login error:", error);
+    toast("فشل تسجيل الدخول: " + error.message);
+  } finally {
+    setLoading(false);
   }
 };
 
+// إنشاء حساب جديد
 $("registerForm").onsubmit = async e => {
   e.preventDefault();
+
+  if (loading) return;
+  setLoading(true);
 
   try {
     const name = $("registerName").value.trim();
     const email = $("registerEmail").value.trim().toLowerCase();
     const password = $("registerPassword").value;
 
-    const { data, error } = await sb.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -319,18 +336,28 @@ $("registerForm").onsubmit = async e => {
     $("authDialog").close();
 
     if (data.session) {
-      await refreshApp();
+      await supabase.auth.signOut();
     }
 
-    toast("تم إرسال طلب التسجيل. انتظر موافقة المسؤول وتأكيد البريد إذا طُلب منك.");
+    toast("تم إرسال طلب الحساب، انتظر موافقة المدير");
+
   } catch (error) {
-    showError(error);
+    console.error("Registration error:", error);
+    toast("تعذر إنشاء الحساب: " + error.message);
+  } finally {
+    setLoading(false);
   }
 };
 
+// تسجيل الخروج
 $("logoutBtn").onclick = async () => {
-  const { error } = await sb.auth.signOut();
-  if (error) return showError(error);
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    console.error(error);
+    toast(error.message);
+    return;
+  }
 
   session = null;
   profile = null;
@@ -338,15 +365,10 @@ $("logoutBtn").onclick = async () => {
   users = [];
 
   renderAccess();
-  $("activeTable").innerHTML = "";
-  $("archiveTable").innerHTML = "";
-
-  if (realtimeChannel) sb.removeChannel(realtimeChannel);
-  realtimeChannel = null;
-
   toast("تم تسجيل الخروج");
 };
 
+// فتح نموذج الوجبة
 function openBatch(b = null) {
   $("batchForm").reset();
   $("batchId").value = b?.id || "";
@@ -355,36 +377,32 @@ function openBatch(b = null) {
     b ? "تعديل بيانات الوجبة" : "إضافة وجبة جديدة";
 
   const fields = {
-    batchNumber:"number",
-    machineNumber:"machine",
-    cartons:"cartons",
-    eggs:"eggs",
-    eggType:"type",
-    entryDate:"entry_date",
-    startAt:"start_at",
-    temperatureAt:"temperature_at",
-    trolleys:"trolleys",
-    candlingStatus:"candling",
-    candlingAt:"candling_at",
-    transferStatus:"transfer",
-    transferAt:"transfer_at",
-    hatchStatus:"hatch_status",
-    chicks:"chicks"
+    batchNumber: "number",
+    machineNumber: "machine",
+    cartons: "cartons",
+    eggs: "eggs",
+    eggType: "type",
+    entryDate: "entry_date",
+    startAt: "start_at",
+    temperatureAt: "temperature_at",
+    trolleys: "trolleys",
+    candlingStatus: "candling",
+    candlingAt: "candling_at",
+    transferStatus: "transfer",
+    transferAt: "transfer_at",
+    hatchStatus: "hatch_status",
+    chicks: "chicks"
   };
 
-  Object.entries(fields).forEach(([id,key]) => {
+  Object.entries(fields).forEach(([id, key]) => {
     let value = b?.[key] ?? "";
 
-    if (["start_at","temperature_at","candling_at","transfer_at"].includes(key)) {
-      value = localInput(value);
-    }
+    if (key === "candling" && !value) value = "لم يتم";
+    if (key === "transfer" && !value) value = "لم يتم";
+    if (key === "hatch_status" && !value) value = "بانتظار الفقس";
 
-    if (key === "candling" || key === "transfer") {
-      value = b?.[key] ?? "لم يتم";
-    }
-
-    if (key === "hatch_status") {
-      value = b?.[key] ?? "بانتظار الفقس";
+    if (["start_at", "temperature_at", "candling_at", "transfer_at"].includes(key) && value) {
+      value = String(value).slice(0, 16);
     }
 
     $(id).value = value;
@@ -395,30 +413,35 @@ function openBatch(b = null) {
 
 $("addBatchBtn").onclick = () => openBatch();
 
+// حفظ الوجبة في Supabase
 $("batchForm").onsubmit = async e => {
   e.preventDefault();
-  if (!isAdmin()) return;
+
+  if (!isAdmin()) {
+    toast("ليس لديك صلاحية إضافة الوجبات");
+    return;
+  }
+
+  if (loading) return;
+  setLoading(true);
 
   try {
     const id = $("batchId").value;
 
-    const timestamp = value =>
-      value ? new Date(value).toISOString() : null;
-
     const data = {
       number: $("batchNumber").value.trim(),
       machine: $("machineNumber").value.trim(),
-      cartons: Number($("cartons").value || 0),
-      eggs: Number($("eggs").value || 0),
+      cartons: Number($("cartons").value),
+      eggs: Number($("eggs").value),
       type: $("eggType").value.trim(),
-      entry_date: $("entryDate").value || null,
-      start_at: timestamp($("startAt").value),
-      temperature_at: timestamp($("temperatureAt").value),
-      trolleys: Number($("trolleys").value || 0),
+      entry_date: $("entryDate").value,
+      start_at: $("startAt").value,
+      temperature_at: $("temperatureAt").value || null,
+      trolleys: $("trolleys").value ? Number($("trolleys").value) : null,
       candling: $("candlingStatus").value,
-      candling_at: timestamp($("candlingAt").value),
+      candling_at: $("candlingAt").value || null,
       transfer: $("transferStatus").value,
-      transfer_at: timestamp($("transferAt").value),
+      transfer_at: $("transferAt").value || null,
       hatch_status: $("hatchStatus").value,
       chicks: $("chicks").value === "" ? null : Number($("chicks").value)
     };
@@ -426,37 +449,54 @@ $("batchForm").onsubmit = async e => {
     let result;
 
     if (id) {
-      result = await sb.from("batches").update(data).eq("id", id);
+      result = await supabase
+        .from("batches")
+        .update(data)
+        .eq("id", id)
+        .select()
+        .single();
     } else {
-      result = await sb.from("batches").insert(data);
+      result = await supabase
+        .from("batches")
+        .insert(data)
+        .select()
+        .single();
     }
 
     if (result.error) throw result.error;
 
     $("batchDialog").close();
     await loadBatches();
-    toast("تم حفظ بيانات الوجبة بنجاح");
+    toast(id ? "تم تعديل الوجبة بنجاح" : "تم حفظ الوجبة بنجاح");
+
   } catch (error) {
-    showError(error);
+    console.error("Save batch error:", error);
+    toast("فشل حفظ الوجبة: " + error.message);
+  } finally {
+    setLoading(false);
   }
 };
 
+// أزرار الجداول
 document.addEventListener("click", async e => {
-  try {
-    const edit = e.target.closest("[data-edit]");
-    if (edit && isAdmin()) {
-      openBatch(batches.find(b => b.id === edit.dataset.edit));
-      return;
-    }
+  const edit = e.target.closest("[data-edit]");
 
-    const archive = e.target.closest("[data-archive]");
-    if (archive && isAdmin()) {
-      const b = batches.find(x => x.id === archive.dataset.archive);
-      if (!b) return;
+  if (edit && isAdmin()) {
+    openBatch(batches.find(b => b.id === edit.dataset.edit));
+    return;
+  }
 
-      if (!confirm(`تحويل الوجبة ${b.number} إلى السجلات المكتملة؟`)) return;
+  const archive = e.target.closest("[data-archive]");
 
-      const { error } = await sb.from("batches")
+  if (archive && isAdmin()) {
+    const b = batches.find(x => x.id === archive.dataset.archive);
+    if (!b) return;
+
+    if (!confirm(`تحويل الوجبة ${b.number} إلى السجلات المكتملة؟`)) return;
+
+    try {
+      const { error } = await supabase
+        .from("batches")
         .update({
           archived: true,
           archived_at: new Date().toISOString(),
@@ -468,71 +508,126 @@ document.addEventListener("click", async e => {
 
       await loadBatches();
       toast("تم نقل الوجبة إلى السجلات");
+
+    } catch (error) {
+      console.error("Archive error:", error);
+      toast("تعذر نقل الوجبة: " + error.message);
     }
+    return;
+  }
 
-    const view = e.target.closest("[data-view]");
-    if (view) {
-      const b = batches.find(x => x.id === view.dataset.view);
-      if (!b) return;
+  const view = e.target.closest("[data-view]");
 
-      const entries = [
-        ["رقم الوجبة",b.number],
-        ["رقم الجهاز",b.machine],
-        ["عدد الكراتين",b.cartons],
-        ["عدد البيض",b.eggs],
-        ["نوع البيض",b.type],
-        ["تاريخ إدخال البيض",b.entry_date],
-        ["تشغيل الجهاز",fmt(b.start_at)],
-        ["أخذ الحرارة",fmt(b.temperature_at)],
-        ["عدد العربايات",b.trolleys],
-        ["فحص الضوء",b.candling],
-        ["وقت فحص الضوء",fmt(b.candling_at)],
-        ["النقل للفاقسة",b.transfer],
-        ["وقت النقل",fmt(b.transfer_at)],
-        ["حالة الفقسة",b.hatch_status],
-        ["عدد الصيصان",b.chicks ?? "—"],
-        ["تاريخ الأرشفة",fmt(b.archived_at)]
-      ];
+  if (view) {
+    const b = batches.find(x => x.id === view.dataset.view);
+    if (!b) return;
 
-      $("recordDetails").innerHTML = entries.map(([k,v]) =>
-        `<div class="detail"><small>${esc(k)}</small><b>${esc(v ?? "—")}</b></div>`
-      ).join("");
+    const entries = [
+      ["رقم الوجبة", b.number],
+      ["رقم الجهاز", b.machine],
+      ["عدد الكراتين", b.cartons],
+      ["عدد البيض", b.eggs],
+      ["نوع البيض", b.type],
+      ["تاريخ إدخال البيض", b.entry_date],
+      ["تشغيل الجهاز", fmt(b.start_at)],
+      ["أخذ الحرارة", fmt(b.temperature_at)],
+      ["عدد العربايات", b.trolleys],
+      ["فحص الضوء", b.candling],
+      ["وقت فحص الضوء", fmt(b.candling_at)],
+      ["النقل للفاقسة", b.transfer],
+      ["وقت النقل", fmt(b.transfer_at)],
+      ["حالة الفقسة", b.hatch_status],
+      ["عدد الصيصان", b.chicks ?? "—"],
+      ["تاريخ الأرشفة", fmt(b.archived_at)]
+    ];
 
-      $("recordDialog").showModal();
-    }
+    $("recordDetails").innerHTML = entries.map(([k, v]) => `
+      <div class="detail">
+        <small>${esc(k)}</small>
+        <b>${esc(v ?? "—")}</b>
+      </div>
+    `).join("");
 
-    const approve = e.target.closest("[data-approve]");
-    if (approve && isAdmin()) {
-      const { error } = await sb.from("profiles")
+    $("recordDialog").showModal();
+    return;
+  }
+
+  const approve = e.target.closest("[data-approve]");
+
+  if (approve && isAdmin()) {
+    const id = approve.dataset.approve;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
         .update({ status: "approved" })
-        .eq("id", approve.dataset.approve);
+        .eq("id", id);
 
       if (error) throw error;
 
       await loadUsers();
-      renderBatches();
       toast("تمت الموافقة على الحساب");
-    }
 
-    const reject = e.target.closest("[data-reject]");
-    if (reject && isAdmin()) {
-      const { error } = await sb.from("profiles")
+    } catch (error) {
+      console.error("Approve error:", error);
+      toast("تعذرت الموافقة: " + error.message);
+    }
+    return;
+  }
+
+  const reject = e.target.closest("[data-reject]");
+
+  if (reject && isAdmin()) {
+    const id = reject.dataset.reject;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
         .update({ status: "rejected" })
-        .eq("id", reject.dataset.reject);
+        .eq("id", id);
 
       if (error) throw error;
 
       await loadUsers();
-      renderBatches();
       toast("تم رفض طلب الحساب");
+
+    } catch (error) {
+      console.error("Reject error:", error);
+      toast("تعذر رفض الحساب: " + error.message);
     }
-  } catch (error) {
-    showError(error);
   }
 });
 
-sb.auth.onAuthStateChange(() => {
-  setTimeout(() => refreshApp(), 0);
+// استعادة جلسة الدخول مرة واحدة
+async function init() {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) throw error;
+
+    session = data.session;
+
+    if (session) {
+      await loadProfile();
+    } else {
+      renderAccess();
+    }
+
+  } catch (error) {
+    console.error("Initialization error:", error);
+    toast("تعذر الاتصال: " + error.message);
+  }
+}
+
+// مراقبة تغير حالة الدخول
+supabase.auth.onAuthStateChange((event, newSession) => {
+  if (event === "SIGNED_OUT") {
+    session = null;
+    profile = null;
+    batches = [];
+    users = [];
+    renderAccess();
+  }
 });
 
-refreshApp();
+init();
