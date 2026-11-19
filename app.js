@@ -183,7 +183,10 @@ function render() {
             ? `${(Number(b.chicks) / Number(b.eggs) * 100).toFixed(1)}%`
             : "—"}
         </td>
-        <td><button class="mini-btn view" data-view="${b.id}">عرض السجل</button></td>
+        <td>
+          <button class="mini-btn view" data-view="${b.id}">عرض السجل</button>
+          ${isAdmin() ? `<button class="mini-btn reject" data-delete="${b.id}">حذف السجل</button>` : ""}
+        </td>
       </tr>
     `).join("")
     : `<tr><td colspan="9" class="empty">لا توجد سجلات مؤرشفة.</td></tr>`;
@@ -411,6 +414,34 @@ document.addEventListener("click", async e => {
     } catch (error) {
       console.error("Archive error:", error);
       toast("تعذر نقل الوجبة: " + error.message);
+    }
+    return;
+  }
+
+  const del = e.target.closest("[data-delete]");
+
+  if (del && isAdmin()) {
+    const b = batches.find(x => x.id === del.dataset.delete);
+    if (!b || !b.archived) return;
+
+    if (!confirm(`تحذير: هل أنت متأكد من حذف سجل الوجبة ${b.number} نهائياً؟ لا يمكن التراجع عن الحذف.`)) return;
+
+    del.disabled = true;
+    try {
+      const { error } = await supabase
+        .from("batches")
+        .delete()
+        .eq("id", b.id)
+        .eq("archived", true);
+
+      if (error) throw error;
+
+      await loadBatches();
+      toast(`تم حذف سجل الوجبة ${b.number}`);
+    } catch (error) {
+      console.error("Delete archived batch error:", error);
+      toast("تعذر حذف السجل: " + error.message);
+      del.disabled = false;
     }
     return;
   }
