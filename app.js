@@ -517,3 +517,21 @@ supabase.auth.onAuthStateChange((event, newSession) => {
 });
 
 init();
+function convertToEnglishNumbers() {
+    const elements = document.querySelectorAll(
+        'body *'
+    );
+
+    elements.forEach(element => {
+        if (element.children.length === 0 && element.textContent) {
+            element.textContent = element.textContent.replace(
+                /[٠-٩۰-۹]/g,
+                digit => '0123456789'[
+                    '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'.indexOf(digit) % 10
+                ]
+            );
+        }
+    });
+}
+
+convertToEnglishNumbers();
