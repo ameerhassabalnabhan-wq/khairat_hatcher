@@ -1,1 +1,0 @@
-# khairat_hatcher
