@@ -205,7 +205,7 @@ body{margin:0;
         box-shadow:0 4px 14px #183c3010}
 
 
-        .stat-card span,.stat-card small{
+        .stat-card span, .stat-card1 span,.stat-card small{
         display:block;
         color:var(--muted);
         font-size:12px}
@@ -214,6 +214,26 @@ body{margin:0;
         .stat-card strong{
         display:block;
         color:var(--green2);
+        font-size:29px;
+        margin:5px 0}
+
+          .stat-card1{
+        background:#ffffff;
+        border:1px solid var(--line);
+        border-radius:14px;
+        padding:19px;
+        
+        box-shadow:0 4px 14px #000000a3}
+
+
+        .stat-card1 strong{
+        display:block;
+        color:var(--green2);
+        color: rgb(255, 19, 2);
+        background-color: #ff000000
+        ;border-bottom: 5px solid rgb(4, 4, 4);
+        border-radius: 18px;
+        padding: 12px;
         font-size:29px;
         margin:5px 0}
 
