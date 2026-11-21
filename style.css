@@ -715,3 +715,9 @@ footer small {
     margin-right: auto;
   }
 }
+/* عرض الجدول المختصر والموسع */
+.active-table-toggle { margin-inline-start: auto; }
+#activeTable .age-cell { font-weight: 800; color: #153f34; }
+#activeTable small { display: block; margin-top: 4px; }
+table.active-expanded { min-width: 1500px; }
+@media(max-width:560px) { .active-table-toggle { width: 100%; } }
