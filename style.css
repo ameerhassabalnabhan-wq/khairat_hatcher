@@ -1,5 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
-:root{--green:#000000;--green2:#040404;--gold:#e4b85c;--ink:#24352f;--muted:#718078;--line:#ecebe5;--bg:#ffda0a7a;--white:#fff}
+
+:root{--green:linear-gradient(100deg,#0055ff,#140397);
+    --green2:linear-gradient(10deg,#2871df,#000290);
+    --gold:#f3a703;rgb(1, 0, 0);
+    --ink:#000000;
+    --muted:#010000;
+    --line:#ecebe5;
+    --bg:linear-gradient(100deg,#80fbff,#0059ff);
+    --white:#fff}
+
 *{box-sizing:border-box}
 
 
@@ -120,7 +129,8 @@ body{margin:0;
 
 
     .hero{
-        background:linear-gradient(25deg,#ffd000,rgb(7, 7, 7),#0d0e0d);
+        background:linear-gradient(150deg,#948bf39d,#240cffa7);
+        border: 5px solid rgb(255, 255, 255);
         border-radius:10px;
         padding:52px 5%;
         color:#f5bc01;
@@ -272,8 +282,8 @@ body{margin:0;
         text-align:center;
         font-size:12px}
         
-        th{background:#000000;
-        color:#eec600;
+        th{background:#7200eb;
+        color:#dfdfdf;
         padding:14px 10px;
         white-space:nowrap;
 
