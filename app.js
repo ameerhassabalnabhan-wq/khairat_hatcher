@@ -20,6 +20,7 @@ let session = null;
 let profile = null;
 let batches = [];
 let loading = false;
+let activeTableExpanded = false;
 
 const isAdmin = () =>
   profile?.role === "admin" && profile?.status === "approved";
@@ -47,6 +48,22 @@ const dateFmt = value =>
 // تاريخ الأرشفة بدون الساعة
 const archiveDateFmt = value =>
   value ? new Date(value).toLocaleDateString("ar-IQ") : "—";
+
+// عمر الوجبة منذ تاريخ ووقت تشغيل الجهاز
+function batchAge(value) {
+  if (!value) return "—";
+  const start = new Date(value).getTime();
+  if (!Number.isFinite(start)) return "—";
+  const diff = Math.max(0, Date.now() - start);
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  return `${days} يوم ${hours} ساعة`;
+}
+
+function toggleActiveDetails() {
+  activeTableExpanded = !activeTableExpanded;
+  render();
+}
 
 function toast(message) {
   const el = $("toast");
@@ -149,53 +166,18 @@ function render() {
   $("archiveCount").textContent = archived.length;
   $("archiveLabel").textContent = `${archived.length} سجل`;
 
-  // جدول الوجبات النشطة
-  $("activeTable").innerHTML = active.length
-    ? active.map(b => `
-      <tr>
-        <td><b>${esc(b.number)}</b></td>
-        <td>${esc(b.machine)}</td>
-        <td>${esc(b.cartons)}</td>
-        <td>${Number(b.eggs).toLocaleString("en-US")}</td>
-        <td>${esc(b.type)}</td>
-
-        <td>${dateFmt(b.entry_date)}</td>
-
-        <td>${fmt(b.start_at)}</td>
-
-        <td>${dateFmt(b.temperature_at)}</td>
-
-        <td>${esc(b.trolleys ?? "—")}</td>
-
-        <td>
-          ${esc(b.candling)}
-          ${b.candling_at
-            ? `<small>${dateFmt(b.candling_at)}</small>`
-            : ""}
-        </td>
-
-        <td>
-          ${esc(b.transfer)}
-          ${b.transfer_at
-            ? `<small>${dateFmt(b.transfer_at)}</small>`
-            : ""}
-        </td>
-
-        <td>
-          <span class="status">${esc(b.hatch_status)}</span>
-        </td>
-
-        <td>${dateFmt(b.chick_pull_date)}</td>
-
-        <td>
-          ${isAdmin() ? `
-            <button class="mini-btn edit" data-edit="${b.id}">تعديل</button>
-            <button class="mini-btn archive" data-archive="${b.id}">تحويل للسجلات</button>
-          ` : "—"}
-        </td>
-      </tr>
-    `).join("")
-    : `<tr><td colspan="14" class="empty">لا توجد وجبات نشطة حالياً.</td></tr>`;
+  // الجدول النشط المختصر أو الموسّع
+  const toggleBtn = $("toggleActiveDetailsBtn");
+  if (toggleBtn) toggleBtn.textContent = activeTableExpanded ? "إغلاق التفاصيل" : "عرض التفاصيل";
+  const activeTable = document.querySelector("#activeTable").closest("table");
+  if (activeTable) activeTable.classList.toggle("active-expanded", activeTableExpanded);
+  const actions = b => isAdmin() ? `<button class="mini-btn edit" data-edit="${b.id}">تعديل</button><button class="mini-btn archive" data-archive="${b.id}">تحويل للسجلات</button>` : "—";
+  const shortHead = `<tr><th>رقم الوجبة</th><th>العمر</th><th>إدخال البيض</th><th>القلب</th><th>السحب</th><th>الإجراءات</th></tr>`;
+  const fullHead = `<tr><th>رقم الوجبة</th><th>رقم الجهاز</th><th>العمر</th><th>عدد الكراتين</th><th>عدد البيض</th><th>نوع البيض</th><th>إدخال البيض</th><th>تشغيل الجهاز</th><th>أخذ الحرارة</th><th>العربايات</th><th>فحص الضوء</th><th>النقل للفاقسة</th><th>الفقسة</th><th>السحب</th><th>الإجراءات</th></tr>`;
+  if (activeTable) activeTable.querySelector("thead").innerHTML = activeTableExpanded ? fullHead : shortHead;
+  const shortRows = active.map(b => `<tr><td><b>${esc(b.number)}</b></td><td class="age-cell" data-start="${esc(b.start_at || "")}">${batchAge(b.start_at)}</td><td>${dateFmt(b.entry_date)}</td><td>${dateFmt(b.transfer_at)}</td><td>${dateFmt(b.chick_pull_date)}</td><td>${actions(b)}</td></tr>`).join("");
+  const fullRows = active.map(b => `<tr><td><b>${esc(b.number)}</b></td><td>${esc(b.machine)}</td><td class="age-cell" data-start="${esc(b.start_at || "")}">${batchAge(b.start_at)}</td><td>${esc(b.cartons)}</td><td>${Number(b.eggs || 0).toLocaleString("en-US")}</td><td>${esc(b.type)}</td><td>${dateFmt(b.entry_date)}</td><td>${fmt(b.start_at)}</td><td>${dateFmt(b.temperature_at)}</td><td>${esc(b.trolleys ?? "—")}</td><td>${esc(b.candling)}${b.candling_at ? `<small>${dateFmt(b.candling_at)}</small>` : ""}</td><td>${esc(b.transfer)}${b.transfer_at ? `<small>${dateFmt(b.transfer_at)}</small>` : ""}</td><td><span class="status">${esc(b.hatch_status)}</span></td><td>${dateFmt(b.chick_pull_date)}</td><td>${actions(b)}</td></tr>`).join("");
+  $("activeTable").innerHTML = active.length ? (activeTableExpanded ? fullRows : shortRows) : `<tr><td colspan="${activeTableExpanded ? 15 : 6}" class="empty">لا توجد وجبات نشطة حالياً.</td></tr>`;
 
   // جدول الوجبات المؤرشفة
   $("archiveTable").innerHTML = archived.length
@@ -360,6 +342,7 @@ function openBatch(b = null) {
 }
 
 $("addBatchBtn").onclick = () => openBatch();
+$("toggleActiveDetailsBtn").onclick = toggleActiveDetails;
 
 // حفظ الوجبة
 $("batchForm").onsubmit = async e => {
@@ -607,3 +590,6 @@ function convertToEnglishNumbers() {
 
 init();
 convertToEnglishNumbers();
+setInterval(() => {
+  document.querySelectorAll(".age-cell[data-start]").forEach(cell => { cell.textContent = batchAge(cell.dataset.start); });
+}, 60000);
