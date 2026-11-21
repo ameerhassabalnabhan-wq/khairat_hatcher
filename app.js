@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = "https://ulofkckropitsrgwtkdn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Qg5X1BAbzDs3r4cT3Z77Jg_M1NK2jhm";
 
+// حساب الزوار المشترك: أنشئ هذا البريد كمستخدم Auth في Supabase ولا توزّعه على الزوار.
 const VISITOR_EMAIL = "viewer@khairat.local";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -20,7 +21,6 @@ let session = null;
 let profile = null;
 let batches = [];
 let loading = false;
-let activeTableExpanded = false;
 
 const isAdmin = () =>
   profile?.role === "admin" && profile?.status === "approved";
@@ -37,39 +37,15 @@ const esc = value =>
     "'": "&#39;"
   })[c]);
 
-// تاريخ + ساعة (لتشغيل الجهاز فقط)
 const fmt = value =>
   value ? new Date(value).toLocaleString("ar-IQ") : "—";
 
-// تاريخ فقط (بدون ساعة)
-const dateFmt = value =>
-  value ? String(value).slice(0, 10) : "—";
-
-// تاريخ الأرشفة بدون الساعة
-const archiveDateFmt = value =>
-  value ? new Date(value).toLocaleDateString("ar-IQ") : "—";
-
-// عمر الوجبة منذ تاريخ ووقت تشغيل الجهاز
-function batchAge(value) {
-  if (!value) return "—";
-  const start = new Date(value).getTime();
-  if (!Number.isFinite(start)) return "—";
-  const diff = Math.max(0, Date.now() - start);
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor((diff % 86400000) / 3600000);
-  return `${days} يوم ${hours} ساعة`;
-}
-
-function toggleActiveDetails() {
-  activeTableExpanded = !activeTableExpanded;
-  render();
-}
+const dateFmt = value => value || "—";
 
 function toast(message) {
   const el = $("toast");
   el.textContent = message;
   el.classList.add("show");
-
   setTimeout(() => el.classList.remove("show"), 3000);
 }
 
@@ -79,7 +55,6 @@ function setLoading(value) {
   if (button) button.disabled = value;
 }
 
-// صلاحيات الدخول
 function renderAccess() {
   $("currentUser").textContent = session
     ? `${profile?.full_name || (session.user.email === VISITOR_EMAIL ? "زائر" : session.user.email)} (${isAdmin() ? "مدير" : "مشاهد"})`
@@ -96,7 +71,6 @@ function renderAccess() {
   });
 }
 
-// تحميل ملف الحساب
 async function loadProfile() {
   if (!session) {
     profile = null;
@@ -126,7 +100,6 @@ async function loadProfile() {
   }
 }
 
-// تحميل الوجبات
 async function loadBatches() {
   const { data, error } = await supabase
     .from("batches")
@@ -143,7 +116,6 @@ async function loadBatches() {
   render();
 }
 
-// عرض الجداول
 function render() {
   renderAccess();
 
@@ -164,22 +136,38 @@ function render() {
     .toLocaleString("en-US");
 
   $("archiveCount").textContent = archived.length;
+
   $("archiveLabel").textContent = `${archived.length} سجل`;
 
-  // الجدول النشط المختصر أو الموسّع
-  const toggleBtn = $("toggleActiveDetailsBtn");
-  if (toggleBtn) toggleBtn.textContent = activeTableExpanded ? "إغلاق التفاصيل" : "عرض التفاصيل";
-  const activeTable = document.querySelector("#activeTable").closest("table");
-  if (activeTable) activeTable.classList.toggle("active-expanded", activeTableExpanded);
-  const actions = b => isAdmin() ? `<button class="mini-btn edit" data-edit="${b.id}">تعديل</button><button class="mini-btn archive" data-archive="${b.id}">تحويل للسجلات</button>` : "—";
-  const shortHead = `<tr><th>رقم الوجبة</th><th>العمر</th><th>إدخال البيض</th><th>القلب</th><th>السحب</th><th>الإجراءات</th></tr>`;
-  const fullHead = `<tr><th>رقم الوجبة</th><th>رقم الجهاز</th><th>العمر</th><th>عدد الكراتين</th><th>عدد البيض</th><th>نوع البيض</th><th>إدخال البيض</th><th>تشغيل الجهاز</th><th>أخذ الحرارة</th><th>العربايات</th><th>فحص الضوء</th><th>النقل للفاقسة</th><th>الفقسة</th><th>السحب</th><th>الإجراءات</th></tr>`;
-  if (activeTable) activeTable.querySelector("thead").innerHTML = activeTableExpanded ? fullHead : shortHead;
-  const shortRows = active.map(b => `<tr><td><b>${esc(b.number)}</b></td><td class="age-cell" data-start="${esc(b.start_at || "")}">${batchAge(b.start_at)}</td><td>${dateFmt(b.entry_date)}</td><td>${dateFmt(b.transfer_at)}</td><td>${dateFmt(b.chick_pull_date)}</td><td>${actions(b)}</td></tr>`).join("");
-  const fullRows = active.map(b => `<tr><td><b>${esc(b.number)}</b></td><td>${esc(b.machine)}</td><td class="age-cell" data-start="${esc(b.start_at || "")}">${batchAge(b.start_at)}</td><td>${esc(b.cartons)}</td><td>${Number(b.eggs || 0).toLocaleString("en-US")}</td><td>${esc(b.type)}</td><td>${dateFmt(b.entry_date)}</td><td>${fmt(b.start_at)}</td><td>${dateFmt(b.temperature_at)}</td><td>${esc(b.trolleys ?? "—")}</td><td>${esc(b.candling)}${b.candling_at ? `<small>${dateFmt(b.candling_at)}</small>` : ""}</td><td>${esc(b.transfer)}${b.transfer_at ? `<small>${dateFmt(b.transfer_at)}</small>` : ""}</td><td><span class="status">${esc(b.hatch_status)}</span></td><td>${dateFmt(b.chick_pull_date)}</td><td>${actions(b)}</td></tr>`).join("");
-  $("activeTable").innerHTML = active.length ? (activeTableExpanded ? fullRows : shortRows) : `<tr><td colspan="${activeTableExpanded ? 15 : 6}" class="empty">لا توجد وجبات نشطة حالياً.</td></tr>`;
+  $("activeTable").innerHTML = active.length
+    ? active.map(b => `
+      <tr>
+        <td><b>${esc(b.number)}</b></td>
+        <td>${esc(b.machine)}</td>
+        <td>${esc(b.cartons)}</td>
+        <td>${Number(b.eggs).toLocaleString("en-US")}</td>
+        <td>${esc(b.type)}</td>
+        <td>${dateFmt(b.entry_date)}</td>
+        <td>${fmt(b.start_at)}</td>
+        <td>${fmt(b.temperature_at)}</td>
+        <td>${esc(b.trolleys ?? "—")}</td>
+        <td>${esc(b.candling)}
+          ${b.candling_at ? `<small>${fmt(b.candling_at)}</small>` : ""}
+        </td>
+        <td>${esc(b.transfer)}
+          ${b.transfer_at ? `<small>${fmt(b.transfer_at)}</small>` : ""}
+        </td>
+        <td><span class="status">${esc(b.hatch_status)}</span></td>
+        <td>
+          ${isAdmin() ? `
+            <button class="mini-btn edit" data-edit="${b.id}">تعديل</button>
+            <button class="mini-btn archive" data-archive="${b.id}">تحويل للسجلات</button>
+          ` : "—"}
+        </td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="13" class="empty">لا توجد وجبات نشطة حالياً.</td></tr>`;
 
-  // جدول الوجبات المؤرشفة
   $("archiveTable").innerHTML = archived.length
     ? archived.map(b => `
       <tr>
@@ -188,28 +176,23 @@ function render() {
         <td>${Number(b.eggs).toLocaleString("en-US")}</td>
         <td>${esc(b.type)}</td>
         <td>${dateFmt(b.entry_date)}</td>
-        <td>${archiveDateFmt(b.archived_at)}</td>
-        <td>${dateFmt(b.chick_pull_date)}</td>
+        <td>${fmt(b.archived_at)}</td>
         <td>${esc(b.chicks ?? "—")}</td>
-
         <td>
           ${b.eggs && b.chicks !== "" && b.chicks != null
             ? `${(Number(b.chicks) / Number(b.eggs) * 100).toFixed(1)}%`
             : "—"}
         </td>
-
         <td>
           <button class="mini-btn view" data-view="${b.id}">عرض السجل</button>
-          ${isAdmin()
-            ? `<button class="mini-btn reject" data-delete="${b.id}">حذف السجل</button>`
-            : ""}
+          ${isAdmin() ? `<button class="mini-btn reject" data-delete="${b.id}">حذف السجل</button>` : ""}
         </td>
       </tr>
     `).join("")
-    : `<tr><td colspan="10" class="empty">لا توجد سجلات مؤرشفة.</td></tr>`;
+    : `<tr><td colspan="9" class="empty">لا توجد سجلات مؤرشفة.</td></tr>`;
+
 }
 
-// تسجيل الدخول
 function showAuth() {
   $("authDialog").showModal();
 }
@@ -220,6 +203,7 @@ document.querySelectorAll("[data-close]").forEach(button => {
   button.onclick = () => $(button.dataset.close).close();
 });
 
+// تسجيل الدخول
 $("loginForm").onsubmit = async e => {
   e.preventDefault();
 
@@ -258,7 +242,6 @@ $("loginForm").onsubmit = async e => {
 
     $("authDialog").close();
     $("loginForm").reset();
-
     toast("أهلاً بك في مفقس خيرات أربيل");
 
   } catch (error) {
@@ -310,7 +293,6 @@ function openBatch(b = null) {
     transferStatus: "transfer",
     transferAt: "transfer_at",
     hatchStatus: "hatch_status",
-    chickPullDate: "chick_pull_date",
     chicks: "chicks"
   };
 
@@ -321,18 +303,8 @@ function openBatch(b = null) {
     if (key === "transfer" && !value) value = "لم يتم";
     if (key === "hatch_status" && !value) value = "بانتظار الفقس";
 
-    // تشغيل الجهاز تاريخ + ساعة
-    if (key === "start_at" && value) {
+    if (["start_at", "temperature_at", "candling_at", "transfer_at"].includes(key) && value) {
       value = String(value).slice(0, 16);
-    }
-
-    // بقية التواريخ بدون ساعة
-    if (
-      ["temperature_at", "candling_at", "transfer_at", "chick_pull_date"]
-        .includes(key) &&
-      value
-    ) {
-      value = String(value).slice(0, 10);
     }
 
     $(id).value = value;
@@ -342,9 +314,8 @@ function openBatch(b = null) {
 }
 
 $("addBatchBtn").onclick = () => openBatch();
-$("toggleActiveDetailsBtn").onclick = toggleActiveDetails;
 
-// حفظ الوجبة
+// حفظ الوجبة في Supabase
 $("batchForm").onsubmit = async e => {
   e.preventDefault();
 
@@ -365,33 +336,16 @@ $("batchForm").onsubmit = async e => {
       cartons: Number($("cartons").value),
       eggs: Number($("eggs").value),
       type: $("eggType").value.trim(),
-
       entry_date: $("entryDate").value,
-
-      // تاريخ + ساعة تشغيل الجهاز
       start_at: $("startAt").value,
-
-      // تواريخ فقط
       temperature_at: $("temperatureAt").value || null,
-
-      trolleys: $("trolleys").value
-        ? Number($("trolleys").value)
-        : null,
-
+      trolleys: $("trolleys").value ? Number($("trolleys").value) : null,
       candling: $("candlingStatus").value,
       candling_at: $("candlingAt").value || null,
-
       transfer: $("transferStatus").value,
       transfer_at: $("transferAt").value || null,
-
       hatch_status: $("hatchStatus").value,
-
-      // تاريخ سحب الصيصان
-      chick_pull_date: $("chickPullDate").value || null,
-
-      chicks: $("chicks").value === ""
-        ? null
-        : Number($("chicks").value)
+      chicks: $("chicks").value === "" ? null : Number($("chicks").value)
     };
 
     let result;
@@ -414,9 +368,7 @@ $("batchForm").onsubmit = async e => {
     if (result.error) throw result.error;
 
     $("batchDialog").close();
-
     await loadBatches();
-
     toast(id ? "تم تعديل الوجبة بنجاح" : "تم حفظ الوجبة بنجاح");
 
   } catch (error) {
@@ -429,8 +381,6 @@ $("batchForm").onsubmit = async e => {
 
 // أزرار الجداول
 document.addEventListener("click", async e => {
-
-  // تعديل وجبة
   const edit = e.target.closest("[data-edit]");
 
   if (edit && isAdmin()) {
@@ -438,7 +388,6 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  // أرشفة وجبة
   const archive = e.target.closest("[data-archive]");
 
   if (archive && isAdmin()) {
@@ -466,11 +415,9 @@ document.addEventListener("click", async e => {
       console.error("Archive error:", error);
       toast("تعذر نقل الوجبة: " + error.message);
     }
-
     return;
   }
 
-  // حذف سجل مؤرشف
   const del = e.target.closest("[data-delete]");
 
   if (del && isAdmin()) {
@@ -480,7 +427,6 @@ document.addEventListener("click", async e => {
     if (!confirm(`تحذير: هل أنت متأكد من حذف سجل الوجبة ${b.number} نهائياً؟ لا يمكن التراجع عن الحذف.`)) return;
 
     del.disabled = true;
-
     try {
       const { error } = await supabase
         .from("batches")
@@ -492,17 +438,14 @@ document.addEventListener("click", async e => {
 
       await loadBatches();
       toast(`تم حذف سجل الوجبة ${b.number}`);
-
     } catch (error) {
       console.error("Delete archived batch error:", error);
       toast("تعذر حذف السجل: " + error.message);
       del.disabled = false;
     }
-
     return;
   }
 
-  // عرض سجل الوجبة
   const view = e.target.closest("[data-view]");
 
   if (view) {
@@ -515,18 +458,17 @@ document.addEventListener("click", async e => {
       ["عدد الكراتين", b.cartons],
       ["عدد البيض", b.eggs],
       ["نوع البيض", b.type],
-      ["تاريخ إدخال البيض", dateFmt(b.entry_date)],
+      ["تاريخ إدخال البيض", b.entry_date],
       ["تشغيل الجهاز", fmt(b.start_at)],
-      ["تاريخ أخذ الحرارة", dateFmt(b.temperature_at)],
+      ["أخذ الحرارة", fmt(b.temperature_at)],
       ["عدد العربايات", b.trolleys],
       ["فحص الضوء", b.candling],
-      ["تاريخ فحص الضوء", dateFmt(b.candling_at)],
+      ["وقت فحص الضوء", fmt(b.candling_at)],
       ["النقل للفاقسة", b.transfer],
-      ["تاريخ النقل للفاقسة", dateFmt(b.transfer_at)],
+      ["وقت النقل", fmt(b.transfer_at)],
       ["حالة الفقسة", b.hatch_status],
-      ["تاريخ سحب الصيصان", dateFmt(b.chick_pull_date)],
       ["عدد الصيصان", b.chicks ?? "—"],
-      ["تاريخ الأرشفة", archiveDateFmt(b.archived_at)]
+      ["تاريخ الأرشفة", fmt(b.archived_at)]
     ];
 
     $("recordDetails").innerHTML = entries.map(([k, v]) => `
@@ -539,9 +481,11 @@ document.addEventListener("click", async e => {
     $("recordDialog").showModal();
     return;
   }
+
+
 });
 
-// استعادة جلسة الدخول
+// استعادة جلسة الدخول مرة واحدة
 async function init() {
   try {
     const { data, error } = await supabase.auth.getSession();
@@ -568,28 +512,26 @@ supabase.auth.onAuthStateChange((event, newSession) => {
     session = null;
     profile = null;
     batches = [];
-    renderAccess();
+      renderAccess();
   }
 });
 
-// تحويل الأرقام العربية إلى إنجليزية
+init();
 function convertToEnglishNumbers() {
-  const elements = document.querySelectorAll("body *");
+    const elements = document.querySelectorAll(
+        'body *'
+    );
 
-  elements.forEach(element => {
-    if (element.children.length === 0 && element.textContent) {
-      element.textContent = element.textContent.replace(
-        /[٠-٩۰-۹]/g,
-        digit => '0123456789'[
-          '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'.indexOf(digit) % 10
-        ]
-      );
-    }
-  });
+    elements.forEach(element => {
+        if (element.children.length === 0 && element.textContent) {
+            element.textContent = element.textContent.replace(
+                /[٠-٩۰-۹]/g,
+                digit => '0123456789'[
+                    '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'.indexOf(digit) % 10
+                ]
+            );
+        }
+    });
 }
 
-init();
 convertToEnglishNumbers();
-setInterval(() => {
-  document.querySelectorAll(".age-cell[data-start]").forEach(cell => { cell.textContent = batchAge(cell.dataset.start); });
-}, 60000);
