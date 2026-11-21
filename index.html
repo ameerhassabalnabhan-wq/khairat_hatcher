@@ -2,307 +2,424 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#173d35">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icons/icon-192.png">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <title>مفقس خيرات أربيل | إدارة التفقيس</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#173d35">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <title>مفقس خيرات أربيل | إدارة التفقيس</title>
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-<header class="topbar">
-  <a class="brand" href="#">
-    <span class="brand-mark">🐣</span>
-    <span>
-      <b>مفقس خيرات أربيل</b>
-      <small>نظام إدارة ومتابعة التفقيس</small>
-    </span>
-  </a>
+    <header class="topbar">
 
-  <div class="staff">
-    <span>مشرف التشغيل <b>أمير حسان</b></span>
-    <i></i>
-  </div>
+        <a class="brand" href="#">
+            <span class="brand-mark">🐣</span>
+            <span>
+                <b>مفقس خيرات أربيل</b>
+                <small>نظام إدارة ومتابعة التفقيس</small>
+            </span>
+        </a>
 
-  <div class="account-area">
-    <span id="currentUser" class="current-user">زائر</span>
-    <button id="logoutBtn" class="btn btn-outline hidden">تسجيل الخروج</button>
-    <button id="openLoginBtn" class="btn btn-gold">دخول</button>
-  </div>
-</header>
+        <div class="staff">
+            <span>مشرف التشغيل <b>أمير حسان</b></span>
+            <i></i>
+        </div>
 
-<main class="container">
+        <div class="account-area">
+            <span id="currentUser" class="current-user">زائر</span>
 
-  <section class="hero">
-    <div>
-      <span class="eyebrow">HATCHERY MANAGEMENT SYSTEM</span>
-      <h1>متابعة دقيقة، وإدارة منظمة<br>لكل وجبة تفقيس</h1>
-      <p>سجل الوجبات النشطة، تابع مراحلها، وانقل الوجبات المكتملة إلى الأرشيف مع الاحتفاظ بسجلها.</p>
-    </div>
-    <div class="hero-egg">🥚</div>
-  </section>
+            <button id="logoutBtn" class="btn btn-outline hidden">
+                تسجيل الخروج
+            </button>
 
-  <section id="accessNotice" class="notice">
-    <div class="notice-icon">🔒</div>
-    <div>
-      <b>الدخول مطلوب لمشاهدة بيانات المفقس</b>
-      <p>يمكنك الدخول بكلمة مرور المشاهدة التي يزوّدك بها المسؤول، أو بحساب المدير.</p>
-    </div>
-  </section>
+            <button id="openLoginBtn" class="btn btn-gold">
+                دخول
+            </button>
+        </div>
 
-  <section id="appContent" class="hidden">
+    </header>
 
-    <div class="stats-grid">
-      <article class="stat-card">
-        <span>الوجبات النشطة</span>
-        <strong id="activeCount">0</strong>
-        <small>وجبة قيد التشغيل</small>
-      </article>
+    <main class="container">
 
-      <article class="stat-card1">
-        <span>إجمالي البيض النشط</span>
-        <strong id="eggCount">0</strong>
-        <small>بيضة</small>
-      </article>
+        <section class="hero">
+            <div>
+                <span class="eyebrow">HATCHERY MANAGEMENT SYSTEM</span>
 
-      <article class="stat-card">
-        <span>الوجبات المؤرشفة</span>
-        <strong id="archiveCount">0</strong>
-        <small>وجبة مكتملة</small>
-      </article>
-    </div>
+                <h1>
+                    متابعة دقيقة، وإدارة منظمة<br>
+                    لكل وجبة تفقيس
+                </h1>
 
-    <div class="section-head">
-      <div>
-        <span class="eyebrow dark">LIVE BATCHES</span>
-        <h2>وجبات التفقيس النشطة</h2>
-        <p>مرتبة من الأقدم إلى الأحدث؛ الوجبة الأحدث تظهر في نهاية الجدول.</p>
-      </div>
-      <button id="addBatchBtn" class="btn btn-primary admin-only">＋ إضافة وجبة جديدة</button>
-    </div>
+                <p>
+                    سجل الوجبات النشطة، تابع مراحلها، وانقل الوجبات المكتملة
+                    إلى الأرشيف مع الاحتفاظ بسجلها.
+                </p>
+            </div>
 
-    <div class="table-card">
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>رقم الوجبة</th>
-              <th>رقم الجهاز</th>
-              <th>عدد الكراتين</th>
-              <th>عدد البيض</th>
-              <th>نوع البيض</th>
-              <th>إدخال البيض</th>
-              <th>تشغيل الجهاز</th>
-              <th>أخذ الحرارة</th>
-              <th>العربايات</th>
-              <th>فحص الضوء</th>
-              <th>النقل للفاقسة</th>
-              <th>الفقسة</th>
-              <th>سحب الصيصان</th>
-              <th>الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody id="activeTable">
-            <tr><td colspan="14" class="empty">لا توجد وجبات نشطة حالياً.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+            <div class="hero-egg">🥚</div>
+        </section>
 
-    <div class="section-head archive-head">
-      <div>
-        <span class="eyebrow dark">COMPLETED RECORDS</span>
-        <h2>سجل الوجبات المكتملة</h2>
-        <p>الوجبات المنتهية محفوظة هنا للمشاهدة والرجوع إليها.</p>
-      </div>
-      <span class="count-pill" id="archiveLabel">0 سجل</span>
-    </div>
+        <section id="accessNotice" class="notice">
+            <div class="notice-icon">🔒</div>
 
-    <div class="table-card">
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>رقم الوجبة</th>
-              <th>رقم الجهاز</th>
-              <th>عدد البيض</th>
-              <th>نوع البيض</th>
-              <th>تاريخ الإدخال</th>
-              <th>تاريخ الأرشفة</th>
-              <th>تاريخ سحب الصيصان</th>
-              <th>عدد الصيصان</th>
-              <th>نسبة الفقس</th>
-              <th>الإجراء</th>
-            </tr>
-          </thead>
-          <tbody id="archiveTable">
-            <tr><td colspan="10" class="empty">لا توجد سجلات مؤرشفة.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+            <div>
+                <b>الدخول مطلوب لمشاهدة بيانات المفقس</b>
 
-  </section>
+                <p>
+                    يمكنك الدخول بكلمة مرور المشاهدة التي يزوّدك بها المسؤول،
+                    أو بحساب المدير.
+                </p>
+            </div>
+        </section>
 
-  <footer>
-    <b>مفقس خيرات أربيل</b>
-    <span>مشرف التشغيل: أمير حسان</span>
-    <span>مدير المفقس: بنديان</span>
-    <small>نظام متابعة التفقيس</small>
-  </footer>
+        <section id="appContent" class="hidden">
 
-</main>
+            <div class="stats-grid">
 
-<!-- تسجيل الدخول -->
-<dialog id="authDialog" class="modal">
-  <div class="modal-head">
-    <div>
-      <span class="eyebrow dark">ACCOUNT ACCESS</span>
-      <h2 id="authTitle">تسجيل الدخول</h2>
-    </div>
-    <button class="close-btn" data-close="authDialog">×</button>
-  </div>
+                <article class="stat-card">
+                    <span>الوجبات النشطة</span>
+                    <strong id="activeCount">0</strong>
+                    <small>وجبة قيد التشغيل</small>
+                </article>
 
-  <form id="loginForm" class="form-grid">
-    <label>
-      البريد الإلكتروني
-      <small>(للمدير فقط — اتركه فارغاً إذا كنت زائراً)</small>
-      <input type="email" id="loginEmail" placeholder="admin@example.com">
-    </label>
+                <article class="stat-card1">
+                    <span>إجمالي البيض النشط</span>
+                    <strong id="eggCount">0</strong>
+                    <small>بيضة</small>
+                </article>
 
-    <label>
-      كلمة المرور
-      <input type="password" id="loginPassword" required placeholder="أدخل كلمة المرور">
-    </label>
+                <article class="stat-card">
+                    <span>الوجبات المؤرشفة</span>
+                    <strong id="archiveCount">0</strong>
+                    <small>وجبة مكتملة</small>
+                </article>
 
-    <button class="btn btn-primary full" type="submit">دخول</button>
-    <p class="form-note">الزوار يستخدمون كلمة مرور المشاهدة فقط، ولا يمكنهم إنشاء حسابات.</p>
-  </form>
-</dialog>
+            </div>
 
-<!-- إضافة وتعديل وجبة -->
-<dialog id="batchDialog" class="modal wide">
-  <div class="modal-head">
-    <div>
-      <span class="eyebrow dark">BATCH DETAILS</span>
-      <h2 id="batchDialogTitle">إضافة وجبة جديدة</h2>
-    </div>
-    <button class="close-btn" data-close="batchDialog">×</button>
-  </div>
+            <div class="section-head">
 
-  <form id="batchForm" class="form-grid two-cols">
+                <div>
+                    <span class="eyebrow dark">LIVE BATCHES</span>
 
-    <input type="hidden" id="batchId">
+                    <h2>وجبات التفقيس النشطة</h2>
 
-    <label>رقم الوجبة
-      <input id="batchNumber" required placeholder="مثال: 001">
-    </label>
+                    <p>
+                        مرتبة من الأقدم إلى الأحدث؛ الوجبة الأحدث تظهر
+                        في نهاية الجدول.
+                    </p>
+                </div>
 
-    <label>رقم الجهاز
-      <input id="machineNumber" required placeholder="مثال: 05">
-    </label>
+                <button id="toggleActiveDetailsBtn" class="btn btn-light active-table-toggle">
+                    عرض التفاصيل
+                </button>
 
-    <label>عدد الكراتين
-      <input id="cartons" type="number" min="0" required>
-    </label>
+                <button id="addBatchBtn" class="btn btn-primary admin-only">
+                    ＋ إضافة وجبة جديدة
+                </button>
 
-    <label>عدد البيض
-      <input id="eggs" type="number" min="0" required>
-    </label>
+            </div>
 
-    <label>نوع البيض
-      <input id="eggType" required placeholder="بيض دجاج">
-    </label>
+            <div class="table-card">
+                <div class="table-scroll">
 
-    <label>تاريخ إدخال البيض
-      <input id="entryDate" type="date" required>
-    </label>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>رقم الوجبة</th>
+                                <th>العمر</th>
+                                <th>إدخال البيض</th>
+                                <th>القلب</th>
+                                <th>السحب</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
 
-    <label>تاريخ ووقت تشغيل الجهاز
-      <input id="startAt" type="datetime-local" required>
-    </label>
+                        <tbody id="activeTable">
+                            <tr>
+                                <td colspan="6" class="empty">
+                                    لا توجد وجبات نشطة حالياً.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
 
-    <label>تاريخ أخذ الحرارة
-      <input id="temperatureAt" type="date">
-    </label>
+                </div>
+            </div>
 
-    <label>عدد العربايات
-      <input id="trolleys" type="number" min="0">
-    </label>
+            <div class="section-head archive-head">
 
-    <label>فحص الضوء
-      <select id="candlingStatus">
-        <option value="لم يتم">لم يتم</option>
-        <option value="تم">تم</option>
-      </select>
-    </label>
+                <div>
+                    <span class="eyebrow dark">COMPLETED RECORDS</span>
 
-    <label>تاريخ فحص الضوء
-      <input id="candlingAt" type="date">
-    </label>
+                    <h2>سجل الوجبات المكتملة</h2>
 
-    <label>النقل للفاقسة
-      <select id="transferStatus">
-        <option value="لم يتم">لم يتم</option>
-        <option value="تم">تم</option>
-      </select>
-    </label>
+                    <p>
+                        الوجبات المنتهية محفوظة هنا للمشاهدة والرجوع إليها.
+                    </p>
+                </div>
 
-    <label>تاريخ النقل للفاقسة
-      <input id="transferAt" type="date">
-    </label>
+                <span class="count-pill" id="archiveLabel">0 سجل</span>
 
-    <label>حالة الفقسة
-      <select id="hatchStatus">
-        <option value="بانتظار الفقس">بانتظار الفقس</option>
-        <option value="قيد الفقس">قيد الفقس</option>
-        <option value="تمت">تمت</option>
-      </select>
-    </label>
+            </div>
 
-    <label>تاريخ سحب الصيصان
-      <input id="chickPullDate" type="date">
-    </label>
+            <div class="table-card">
+                <div class="table-scroll">
 
-    <label>عدد الصيصان الناتجة
-      <input id="chicks" type="number" min="0" placeholder="يُدخل عند انتهاء الفقسة">
-    </label>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>رقم الوجبة</th>
+                                <th>رقم الجهاز</th>
+                                <th>عدد البيض</th>
+                                <th>نوع البيض</th>
+                                <th>تاريخ الإدخال</th>
+                                <th>تاريخ الأرشفة</th>
+                                <th>تاريخ سحب الصيصان</th>
+                                <th>عدد الصيصان</th>
+                                <th>نسبة الفقس</th>
+                                <th>الإجراء</th>
+                            </tr>
+                        </thead>
 
-    <div class="form-actions">
-      <button type="button" class="btn btn-light" data-close="batchDialog">إلغاء</button>
-      <button type="submit" class="btn btn-primary">حفظ الوجبة</button>
-    </div>
+                        <tbody id="archiveTable">
+                            <tr>
+                                <td colspan="10" class="empty">
+                                    لا توجد سجلات مؤرشفة.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
 
-  </form>
-</dialog>
+                </div>
+            </div>
 
-<!-- تفاصيل الوجبة -->
-<dialog id="recordDialog" class="modal">
-  <div class="modal-head">
-    <div>
-      <span class="eyebrow dark">ARCHIVED RECORD</span>
-      <h2>تفاصيل الوجبة</h2>
-    </div>
-    <button class="close-btn" data-close="recordDialog">×</button>
-  </div>
-  <div id="recordDetails" class="record-details"></div>
-</dialog>
+        </section>
 
-<div id="toast" class="toast" role="status"></div>
+        <footer>
+            <b>مفقس خيرات أربيل</b>
+            <span>مشرف التشغيل: أمير حسان</span>
+            <span>مدير المفقس: بنديان</span>
+            <small>نظام متابعة التفقيس</small>
+        </footer>
 
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch(console.error);
-    });
-  }
-</script>
+    </main>
 
-<script type="module" src="app.js"></script>
+    <dialog id="authDialog" class="modal">
+
+        <div class="modal-head">
+            <div>
+                <span class="eyebrow dark">ACCOUNT ACCESS</span>
+                <h2 id="authTitle">تسجيل الدخول</h2>
+            </div>
+
+            <button class="close-btn" data-close="authDialog">×</button>
+        </div>
+
+        <form id="loginForm" class="form-grid">
+
+            <label>
+                البريد الإلكتروني
+                <small>
+                    (للمدير فقط — اتركه فارغاً إذا كنت زائراً)
+                </small>
+
+                <input
+                    type="email"
+                    id="loginEmail"
+                    placeholder="admin@example.com"
+                >
+            </label>
+
+            <label>
+                كلمة المرور
+
+                <input
+                    type="password"
+                    id="loginPassword"
+                    required
+                    placeholder="أدخل كلمة المرور"
+                >
+            </label>
+
+            <button class="btn btn-primary full" type="submit">
+                دخول
+            </button>
+
+            <p class="form-note">
+                الزوار يستخدمون كلمة مرور المشاهدة فقط، ولا يمكنهم إنشاء حسابات.
+            </p>
+
+        </form>
+
+    </dialog>
+
+    <dialog id="batchDialog" class="modal wide">
+
+        <div class="modal-head">
+            <div>
+                <span class="eyebrow dark">BATCH DETAILS</span>
+                <h2 id="batchDialogTitle">إضافة وجبة جديدة</h2>
+            </div>
+
+            <button class="close-btn" data-close="batchDialog">×</button>
+        </div>
+
+        <form id="batchForm" class="form-grid two-cols">
+
+            <input type="hidden" id="batchId">
+
+            <label>
+                رقم الوجبة
+                <input id="batchNumber" required placeholder="مثال: 001">
+            </label>
+
+            <label>
+                رقم الجهاز
+                <input id="machineNumber" required placeholder="مثال: 05">
+            </label>
+
+            <label>
+                عدد الكراتين
+                <input id="cartons" type="number" min="0" required>
+            </label>
+
+            <label>
+                عدد البيض
+                <input id="eggs" type="number" min="0" required>
+            </label>
+
+            <label>
+                نوع البيض
+                <input id="eggType" required placeholder="بيض دجاج">
+            </label>
+
+            <label>
+                تاريخ إدخال البيض
+                <input id="entryDate" type="date" required>
+            </label>
+
+            <label>
+                تاريخ ووقت تشغيل الجهاز
+                <input id="startAt" type="datetime-local" required>
+            </label>
+
+            <label>
+                تاريخ أخذ الحرارة
+                <input id="temperatureAt" type="date">
+            </label>
+
+            <label>
+                عدد العربايات
+                <input id="trolleys" type="number" min="0">
+            </label>
+
+            <label>
+                فحص الضوء
+
+                <select id="candlingStatus">
+                    <option value="لم يتم">لم يتم</option>
+                    <option value="تم">تم</option>
+                </select>
+            </label>
+
+            <label>
+                تاريخ فحص الضوء
+                <input id="candlingAt" type="date">
+            </label>
+
+            <label>
+                النقل للفاقسة
+
+                <select id="transferStatus">
+                    <option value="لم يتم">لم يتم</option>
+                    <option value="تم">تم</option>
+                </select>
+            </label>
+
+            <label>
+                تاريخ النقل للفاقسة
+                <input id="transferAt" type="date">
+            </label>
+
+            <label>
+                حالة الفقسة
+
+                <select id="hatchStatus">
+                    <option value="بانتظار الفقس">بانتظار الفقس</option>
+                    <option value="قيد الفقس">قيد الفقس</option>
+                    <option value="تمت">تمت</option>
+                </select>
+            </label>
+
+            <label>
+                تاريخ سحب الصيصان
+                <input id="chickPullDate" type="date">
+            </label>
+
+            <label>
+                عدد الصيصان الناتجة
+                <input
+                    id="chicks"
+                    type="number"
+                    min="0"
+                    placeholder="يُدخل عند انتهاء الفقسة"
+                >
+            </label>
+
+            <div class="form-actions">
+
+                <button
+                    type="button"
+                    class="btn btn-light"
+                    data-close="batchDialog"
+                >
+                    إلغاء
+                </button>
+
+                <button type="submit" class="btn btn-primary">
+                    حفظ الوجبة
+                </button>
+
+            </div>
+
+        </form>
+
+    </dialog>
+
+    <dialog id="recordDialog" class="modal">
+
+        <div class="modal-head">
+            <div>
+                <span class="eyebrow dark">ARCHIVED RECORD</span>
+                <h2>تفاصيل الوجبة</h2>
+            </div>
+
+            <button class="close-btn" data-close="recordDialog">×</button>
+        </div>
+
+        <div id="recordDetails" class="record-details"></div>
+
+    </dialog>
+
+    <div id="toast" class="toast" role="status"></div>
+
+    <script>
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("./sw.js").catch(console.error);
+            });
+        }
+    </script>
+
+    <script type="module" src="app.js"></script>
+
 </body>
 </html>
