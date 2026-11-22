@@ -435,12 +435,12 @@ footer {
   justify-content: center;
   gap: 20px;
   flex-wrap: wrap;
-  color: #64746b;
+  color: white;
   font-size: 12px;
 }
 
 footer b {
-  color: var(--green);
+  color: whit;
 }
 
 footer small {
