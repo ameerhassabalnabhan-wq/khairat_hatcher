@@ -328,7 +328,9 @@ td {
 }
 
 tbody tr:hover {
-  background: #dadada;
+  background:#00ff37;
+  color: #000000;
+  font-size: 16px;
 }
 
 .empty {
