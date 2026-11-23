@@ -370,9 +370,9 @@ tbody tr:hover {
   display: inline-block;
   border-radius: 20px;
   padding: 4px 9px;
-  background: #edf3ef;
-  color: #6b5942;
-  font-size: 11px;
+  background: #000000;
+  color: #f7d200;
+  font-size: 15px;
 }
 
 .archive-head {
